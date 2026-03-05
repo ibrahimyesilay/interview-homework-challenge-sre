@@ -1,18 +1,224 @@
-- name: "[CHALLENGE 5] Deploy container"
-  hosts: all
+---
+- name: "[CHALLENGE 5] Local deploy challenge-3 container (docker preferred, else podman)"
+  hosts: servers
+  become: false
+  gather_facts: true
+
+  vars:
+    app_src_dir: ../challenge-3
+    app_remote_dir: /tmp/challenge-3
+
+    image_name: challenge3-http-server
+    image_tag: latest
+    container_name: challenge3-http-server-c
+
+    host_port: 8080
+    container_port: 8080
+    url: "http://127.0.0.1:{{ host_port }}/"
+
   tasks:
+    - name: Print challenge requirements (evidence)
+      ansible.builtin.debug:
+        msg:
+          - "Challenge 5: Build with Ansible - Requirements evidence"
+          - "1) Inventory contains server: localhost (ansible_connection=local)"
+          - "2) Install docker (requested) -> docker preferred, if missing install/use podman (local-friendly)"
+          - "3) Build image from Dockerfile (challenge-3 sources copied locally under /tmp)"
+          - "4) Deploy container and expose port 8080"
+          - "5) Check HTTP response with header Challenge: orcrist.org (expect 200 + Everything works!)"
+          - "6) Output saved in ansible.log via run.sh (tee)"
+          - "7) Tasks grouped with tags: copy, precheck, install, build, deploy, verify"
+      tags: [precheck]
 
-    - name: Copy challenge-4
+    - name: Copy challenge-3 (Dockerfile + server.py)
       ansible.builtin.copy:
-        src: ../challenge-4
+        src: "{{ app_src_dir }}"
         dest: /tmp/
+      tags: [copy]
 
-    # Continue from here :)
-    # - name: Install Docker
-    #   ...
-    #
-    # - name: Build Dockerfile
-    #   ...
-    #
-    # - name: Deploy container
-    #   ...
+    - name: Show copied source path
+      ansible.builtin.debug:
+        msg:
+          - "Copied sources to: {{ app_remote_dir }}"
+          - "Will build image: {{ image_name }}:{{ image_tag }}"
+      tags: [copy]
+
+    # -------------------------
+    # Detect runtime
+    # -------------------------
+    - name: Check if docker exists
+      ansible.builtin.command: docker --version
+      register: docker_check
+      changed_when: false
+      failed_when: false
+      tags: [precheck]
+
+    - name: Check if podman exists
+      ansible.builtin.command: podman --version
+      register: podman_check
+      changed_when: false
+      failed_when: false
+      tags: [precheck]
+
+    - name: Choose container runtime (docker preferred else podman)
+      ansible.builtin.set_fact:
+        runtime: >-
+          {% if docker_check.rc == 0 %}docker{% elif podman_check.rc == 0 %}podman{% else %}none{% endif %}
+      tags: [precheck]
+
+    - name: Print chosen runtime
+      ansible.builtin.debug:
+        msg:
+          - "docker check rc={{ docker_check.rc }} stdout={{ docker_check.stdout | default('') }}"
+          - "podman check rc={{ podman_check.rc }} stdout={{ podman_check.stdout | default('') }}"
+          - "Chosen runtime: {{ runtime }}"
+      tags: [precheck]
+
+    # -------------------------
+    # Install podman if needed (only when docker missing)
+    # -------------------------
+    - name: Ask to install podman if no runtime found
+      ansible.builtin.pause:
+        prompt: "Docker not found. Install Podman now? (yes/no)"
+      register: install_answer
+      when: runtime == "none"
+      tags: [install]
+
+    - name: Abort if runtime missing and user said no
+      ansible.builtin.fail:
+        msg: "No container runtime available. Install Docker or allow Podman installation."
+      when: runtime == "none" and (install_answer.user_input | lower) not in ["y","yes","evet"]
+      tags: [install]
+
+    - name: Install Podman on macOS via Homebrew
+      ansible.builtin.command: brew install podman
+      when:
+        - runtime == "none"
+        - (install_answer.user_input | lower) in ["y","yes","evet"]
+        - ansible_facts.system == "Darwin"
+      changed_when: true
+      tags: [install]
+
+    - name: Install Podman on Debian/Ubuntu (requires sudo)
+      become: true
+      ansible.builtin.apt:
+        name: podman
+        state: present
+        update_cache: true
+      when:
+        - runtime == "none"
+        - (install_answer.user_input | lower) in ["y","yes","evet"]
+        - ansible_facts.os_family == "Debian"
+      tags: [install]
+
+    - name: Install Podman on Fedora/RHEL (requires sudo)
+      become: true
+      ansible.builtin.dnf:
+        name: podman
+        state: present
+      when:
+        - runtime == "none"
+        - (install_answer.user_input | lower) in ["y","yes","evet"]
+        - ansible_facts.os_family == "RedHat"
+      tags: [install]
+
+    - name: Re-check podman after installation attempt
+      ansible.builtin.command: podman --version
+      register: podman_check2
+      changed_when: false
+      failed_when: false
+      when: runtime == "none"
+      tags: [install]
+
+    - name: Set runtime to podman after install
+      ansible.builtin.set_fact:
+        runtime: "podman"
+      when: runtime == "none" and podman_check2.rc == 0
+      tags: [install]
+
+    - name: Print runtime after install step
+      ansible.builtin.debug:
+        msg:
+          - "Runtime after install: {{ runtime }}"
+          - "Podman version: {{ podman_check2.stdout | default(podman_check.stdout | default('')) }}"
+      when: runtime != "docker"
+      tags: [install]
+
+    # -------------------------
+    # Podman macOS machine (needed on macOS)
+    # -------------------------
+    - name: Ensure podman machine is started (macOS)
+      ansible.builtin.command: podman machine start
+      when: runtime == "podman" and ansible_facts.system == "Darwin"
+      failed_when: false
+      changed_when: true
+      tags: [install]
+
+    # -------------------------
+    # Build image (CLI)
+    # -------------------------
+    - name: Build image ({{ runtime }})
+      ansible.builtin.command:
+        cmd: "{{ runtime }} build -t {{ image_name }}:{{ image_tag }} {{ app_remote_dir }}"
+      register: build_out
+      changed_when: true
+      tags: [build]
+
+    - name: Print build result (evidence)
+      ansible.builtin.debug:
+        msg:
+          - "Build completed for {{ image_name }}:{{ image_tag }}"
+          - "Runtime: {{ runtime }}"
+          - "Build stdout (tail): {{ (build_out.stdout_lines | default([]))[-5:] }}"
+      tags: [build]
+
+    # -------------------------
+    # Deploy container (CLI)
+    # -------------------------
+    - name: Remove existing container if present
+      ansible.builtin.command:
+        cmd: "{{ runtime }} rm -f {{ container_name }}"
+      failed_when: false
+      changed_when: false
+      tags: [deploy]
+
+    - name: Run container ({{ runtime }})
+      ansible.builtin.command:
+        cmd: "{{ runtime }} run -d --name {{ container_name }} -p {{ host_port }}:{{ container_port }} {{ image_name }}:{{ image_tag }}"
+      register: run_out
+      changed_when: true
+      tags: [deploy]
+
+    - name: Print deploy result (evidence)
+      ansible.builtin.debug:
+        msg:
+          - "Container started: {{ container_name }}"
+          - "Published port: {{ host_port }} -> {{ container_port }}"
+          - "Container ID: {{ run_out.stdout | default('') }}"
+      tags: [deploy]
+
+    # -------------------------
+    # Verify HTTP
+    # -------------------------
+    - name: Verify HTTP response (Challenge header)
+      ansible.builtin.uri:
+        url: "{{ url }}"
+        method: GET
+        headers:
+          Challenge: "orcrist.org"
+        return_content: true
+        status_code: 200
+      register: http_check
+      retries: 20
+      delay: 0.2
+      until: http_check.content is search("Everything works!")
+      tags: [verify]
+
+    - name: Print HTTP verification (evidence)
+      ansible.builtin.debug:
+        msg:
+          - "HTTP check URL: {{ url }}"
+          - "Expected: 200 + 'Everything works!'"
+          - "Got status: {{ http_check.status }}"
+          - "Got body: {{ http_check.content }}"
+      tags: [verify]

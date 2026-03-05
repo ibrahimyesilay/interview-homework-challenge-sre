@@ -1,54 +1,35 @@
-# Challenge 5: Helm Chart
+# Challenge 5 – Deployment Automation
 
-## Objective
+While working on **Challenge 5**, I noticed that the assignment description referenced **two different types of tasks in different parts of the challenge list**:
 
-Create a Helm chart to deploy the Python HTTP server from Challenge 3 to Kubernetes.
+1. **Ansible-based deployment**
+2. **Helm-based Kubernetes deployment**
 
-## Background
+Because it was not completely clear which one was the intended implementation for Challenge 5, I decided to **implement both solutions** to ensure that all possible requirements are covered.
 
-The Challenge 3 server is a Python HTTP application that:
-- Listens on **port 8080**
-- Returns `200 OK` with "Everything works!" when the request includes header `Challenge: orcrist.org`
-- Returns `404 Not Found` with "Wrong header!" otherwise
+This directory therefore contains:
 
-Assume the Docker image has been built from your Challenge 3 Dockerfile.
+- an **Ansible solution** for container build and deployment
+- a **Helm solution** for Kubernetes deployment
 
-## Requirements
+Both implementations are fully runnable and validated with helper scripts.
 
-Complete the Helm chart in `server-chart/` with the following:
+---
 
-### 1. values.yaml
-Define configurable values for:
-- Container image (repository, tag, pull policy)
-- Number of replicas
-- Service configuration (type, port)
-- Resource limits/requests (optional)
+# 1. Ansible Implementation
 
-### 2. templates/deployment.yaml
-Create a Kubernetes Deployment that:
-- Deploys the container image
-- Exposes container port 8080
-- Uses values from values.yaml
+The Ansible solution automates the deployment workflow described in the challenge instructions.
 
-### 3. templates/service.yaml
-Create a Kubernetes Service that:
-- Exposes the deployment
-- Routes traffic to port 8080
+The playbook performs the following steps:
 
-### 4. (Optional) templates/_helpers.tpl
-Add template helpers for consistent naming and labels.
+1. Add a server in the inventory  
+2. Install a container runtime  
+3. Prefer **Docker** if it is available  
+4. If Docker is not installed, automatically **install and use Podman**  
+5. Build the Docker image from the **Challenge-3 Dockerfile**  
+6. Deploy the container  
+7. Verify the HTTP endpoint  
 
-## Deliverables
+The HTTP check validates the expected behaviour of the service.
 
-A working Helm chart that can be:
-1. Validated with: `helm lint ./server-chart`
-2. Rendered with: `helm template ./server-chart`
-3. Installed with: `helm install server ./server-chart`
-
-## Acceptance Criteria
-
-- [ ] `helm lint` passes without errors
-- [ ] `helm template` renders valid Kubernetes manifests
-- [ ] Deployment targets container port 8080
-- [ ] Service correctly routes to the deployment
-- [ ] All hardcoded values are parameterized in values.yaml
+Expected request:

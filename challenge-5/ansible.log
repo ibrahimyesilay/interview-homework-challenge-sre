@@ -1,0 +1,126 @@
+Using /Users/ibrahimyesilay/workshop/interview-homework-challenge-sre/challenge-5/ansible.cfg as config file
+
+PLAY [[CHALLENGE 5] Local deploy challenge-3 container (docker preferred, else podman)] ***
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'localhost' is using the discovered Python interpreter at '/opt/homebrew/bin/python3.14', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [localhost]
+
+TASK [Print challenge requirements (evidence)] *********************************
+ok: [localhost] => {
+    "msg": [
+        "Challenge 5: Build with Ansible - Requirements evidence",
+        "1) Inventory contains server: localhost (ansible_connection=local)",
+        "2) Install docker (requested) -> docker preferred, if missing install/use podman (local-friendly)",
+        "3) Build image from Dockerfile (challenge-3 sources copied locally under /tmp)",
+        "4) Deploy container and expose port 8080",
+        "5) Check HTTP response with header Challenge: orcrist.org (expect 200 + Everything works!)",
+        "6) Output saved in ansible.log via run.sh (tee)",
+        "7) Tasks grouped with tags: copy, precheck, install, build, deploy, verify"
+    ]
+}
+
+TASK [Copy challenge-3 (Dockerfile + server.py)] *******************************
+ok: [localhost] => {"changed": false, "dest": "/tmp/", "src": "/Users/ibrahimyesilay/workshop/interview-homework-challenge-sre/challenge-5/../challenge-3"}
+
+TASK [Show copied source path] *************************************************
+ok: [localhost] => {
+    "msg": [
+        "Copied sources to: /tmp/challenge-3",
+        "Will build image: challenge3-http-server:latest"
+    ]
+}
+
+TASK [Check if docker exists] **************************************************
+ok: [localhost] => {"changed": false, "cmd": "docker --version", "failed_when_result": false, "failed_when_suppressed_exception": "(traceback unavailable)", "msg": "Error executing command.", "rc": 2, "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+
+TASK [Check if podman exists] **************************************************
+ok: [localhost] => {"changed": false, "cmd": ["podman", "--version"], "delta": "0:00:00.056576", "end": "2026-03-06 00:50:09.109778", "failed_when_result": false, "msg": "", "rc": 0, "start": "2026-03-06 00:50:09.053202", "stderr": "", "stderr_lines": [], "stdout": "podman version 5.8.0", "stdout_lines": ["podman version 5.8.0"]}
+
+TASK [Choose container runtime (docker preferred else podman)] *****************
+ok: [localhost] => {"ansible_facts": {"runtime": "podman"}, "changed": false}
+
+TASK [Print chosen runtime] ****************************************************
+ok: [localhost] => {
+    "msg": [
+        "docker check rc=2 stdout=",
+        "podman check rc=0 stdout=podman version 5.8.0",
+        "Chosen runtime: podman"
+    ]
+}
+
+TASK [Ask to install podman if no runtime found] *******************************
+skipping: [localhost] => {"changed": false, "false_condition": "runtime == \"none\"", "skip_reason": "Conditional result was False"}
+
+TASK [Abort if runtime missing and user said no] *******************************
+skipping: [localhost] => {"changed": false, "false_condition": "runtime == \"none\" and (install_answer.user_input | lower) not in [\"y\",\"yes\",\"evet\"]", "skip_reason": "Conditional result was False"}
+
+TASK [Install Podman on macOS via Homebrew] ************************************
+skipping: [localhost] => {"changed": false, "false_condition": "runtime == \"none\"", "skip_reason": "Conditional result was False"}
+
+TASK [Install Podman on Debian/Ubuntu (requires sudo)] *************************
+skipping: [localhost] => {"changed": false, "false_condition": "runtime == \"none\"", "skip_reason": "Conditional result was False"}
+
+TASK [Install Podman on Fedora/RHEL (requires sudo)] ***************************
+skipping: [localhost] => {"changed": false, "false_condition": "runtime == \"none\"", "skip_reason": "Conditional result was False"}
+
+TASK [Re-check podman after installation attempt] ******************************
+skipping: [localhost] => {"changed": false, "false_condition": "runtime == \"none\"", "skip_reason": "Conditional result was False"}
+
+TASK [Set runtime to podman after install] *************************************
+skipping: [localhost] => {"changed": false, "false_condition": "runtime == \"none\" and podman_check2.rc == 0", "skip_reason": "Conditional result was False"}
+
+TASK [Print runtime after install step] ****************************************
+ok: [localhost] => {
+    "msg": [
+        "Runtime after install: podman",
+        "Podman version: podman version 5.8.0"
+    ]
+}
+
+TASK [Ensure podman machine is started (macOS)] ********************************
+changed: [localhost] => {"changed": true, "cmd": ["podman", "machine", "start"], "delta": "0:00:00.017810", "end": "2026-03-06 00:50:09.404713", "failed_when_result": false, "failed_when_suppressed_exception": "(traceback unavailable)", "msg": "non-zero return code", "rc": 125, "start": "2026-03-06 00:50:09.386903", "stderr": "Error: unable to start \"podman-machine-default\": already running", "stderr_lines": ["Error: unable to start \"podman-machine-default\": already running"], "stdout": "Starting machine \"podman-machine-default\"", "stdout_lines": ["Starting machine \"podman-machine-default\""]}
+
+TASK [Build image (podman)] ****************************************************
+changed: [localhost] => {"changed": true, "cmd": ["podman", "build", "-t", "challenge3-http-server:latest", "/tmp/challenge-3"], "delta": "0:00:00.206974", "end": "2026-03-06 00:50:09.787709", "msg": "", "rc": 0, "start": "2026-03-06 00:50:09.580735", "stderr": "", "stderr_lines": [], "stdout": "STEP 1/5: FROM python:3.13-slim\nSTEP 2/5: WORKDIR /app\n--> Using cache ba742c3a519f819f94935e8f1e121732d4314076299d954a922d6461aabbd48c\n--> ba742c3a519f\nSTEP 3/5: COPY server.py /app/server.py\n--> Using cache 8c2ef39e658f49ba1d3272e2b029bdefbdef33bd0f83c5e71a3d474f9ae1b484\n--> 8c2ef39e658f\nSTEP 4/5: EXPOSE 8080\n--> Using cache e500815b116a59c70ffd303752afeedc3067353eb3b75d42272c95853488830c\n--> e500815b116a\nSTEP 5/5: CMD [\"python3\", \"/app/server.py\"]\n--> Using cache 6932cdd20ce9eb19cc145719ff6f5e06659bd039f5c5956ba80cfb4f7de2ec16\nCOMMIT challenge3-http-server:latest\n--> 6932cdd20ce9\nSuccessfully tagged localhost/challenge3-http-server:latest\n6932cdd20ce9eb19cc145719ff6f5e06659bd039f5c5956ba80cfb4f7de2ec16", "stdout_lines": ["STEP 1/5: FROM python:3.13-slim", "STEP 2/5: WORKDIR /app", "--> Using cache ba742c3a519f819f94935e8f1e121732d4314076299d954a922d6461aabbd48c", "--> ba742c3a519f", "STEP 3/5: COPY server.py /app/server.py", "--> Using cache 8c2ef39e658f49ba1d3272e2b029bdefbdef33bd0f83c5e71a3d474f9ae1b484", "--> 8c2ef39e658f", "STEP 4/5: EXPOSE 8080", "--> Using cache e500815b116a59c70ffd303752afeedc3067353eb3b75d42272c95853488830c", "--> e500815b116a", "STEP 5/5: CMD [\"python3\", \"/app/server.py\"]", "--> Using cache 6932cdd20ce9eb19cc145719ff6f5e06659bd039f5c5956ba80cfb4f7de2ec16", "COMMIT challenge3-http-server:latest", "--> 6932cdd20ce9", "Successfully tagged localhost/challenge3-http-server:latest", "6932cdd20ce9eb19cc145719ff6f5e06659bd039f5c5956ba80cfb4f7de2ec16"]}
+
+TASK [Print build result (evidence)] *******************************************
+ok: [localhost] => {
+    "msg": [
+        "Build completed for challenge3-http-server:latest",
+        "Runtime: podman",
+        "Build stdout (tail): ['--> Using cache 6932cdd20ce9eb19cc145719ff6f5e06659bd039f5c5956ba80cfb4f7de2ec16', 'COMMIT challenge3-http-server:latest', '--> 6932cdd20ce9', 'Successfully tagged localhost/challenge3-http-server:latest', '6932cdd20ce9eb19cc145719ff6f5e06659bd039f5c5956ba80cfb4f7de2ec16']"
+    ]
+}
+
+TASK [Remove existing container if present] ************************************
+ok: [localhost] => {"changed": false, "cmd": ["podman", "rm", "-f", "challenge3-http-server-c"], "delta": "0:00:10.217603", "end": "2026-03-06 00:50:20.200848", "failed_when_result": false, "msg": "", "rc": 0, "start": "2026-03-06 00:50:09.983245", "stderr": "", "stderr_lines": [], "stdout": "challenge3-http-server-c", "stdout_lines": ["challenge3-http-server-c"]}
+
+TASK [Run container (podman)] **************************************************
+changed: [localhost] => {"changed": true, "cmd": ["podman", "run", "-d", "--name", "challenge3-http-server-c", "-p", "8080:8080", "challenge3-http-server:latest"], "delta": "0:00:00.105804", "end": "2026-03-06 00:50:20.495631", "msg": "", "rc": 0, "start": "2026-03-06 00:50:20.389827", "stderr": "", "stderr_lines": [], "stdout": "60e3e20454d1dc033dcce91bfc73a7b4f9056252d83f46c77075c6199ff48761", "stdout_lines": ["60e3e20454d1dc033dcce91bfc73a7b4f9056252d83f46c77075c6199ff48761"]}
+
+TASK [Print deploy result (evidence)] ******************************************
+ok: [localhost] => {
+    "msg": [
+        "Container started: challenge3-http-server-c",
+        "Published port: 8080 -> 8080",
+        "Container ID: 60e3e20454d1dc033dcce91bfc73a7b4f9056252d83f46c77075c6199ff48761"
+    ]
+}
+
+TASK [Verify HTTP response (Challenge header)] *********************************
+ok: [localhost] => {"attempts": 1, "changed": false, "content": "Everything works!", "content_type": "text/html", "cookies": {}, "cookies_string": "", "date": "Thu, 05 Mar 2026 21:50:20 GMT", "elapsed": 0, "msg": "OK (unknown bytes)", "redirected": false, "server": "SimpleHTTP/0.6 Python/3.13.12", "status": 200, "url": "http://127.0.0.1:8080/"}
+
+TASK [Print HTTP verification (evidence)] **************************************
+ok: [localhost] => {
+    "msg": [
+        "HTTP check URL: http://127.0.0.1:8080/",
+        "Expected: 200 + 'Everything works!'",
+        "Got status: 200",
+        "Got body: Everything works!"
+    ]
+}
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=17   changed=3    unreachable=0    failed=0    skipped=7    rescued=0    ignored=0   
+

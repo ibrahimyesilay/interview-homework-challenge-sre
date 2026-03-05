@@ -1,9 +1,25 @@
-# Challenge 5: Complete this values file
-#
-# Define values for:
-# - image: repository, tag, pullPolicy
-# - replicaCount
-# - service: type, port
-# - resources (optional)
-#
-# Hint: The Python server listens on port 8080
+replicaCount: 1
+
+image:
+  repository: challenge3-http-server
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Container port (app listens here)
+containerPort: 8080
+
+service:
+  type: ClusterIP
+  port: 8080
+
+# Optional resource requests/limits
+resources: {}
+#  requests:
+#    cpu: 100m
+#    memory: 64Mi
+#  limits:
+#    cpu: 500m
+#    memory: 256Mi
+
+nameOverride: ""
+fullnameOverride: ""

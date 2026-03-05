@@ -1,5 +1,6 @@
 apiVersion: v2
 name: server-chart
-description: A Helm chart to deploy the Challenge 3 Python server
+description: Helm chart to deploy the Challenge-3 Python HTTP server
+type: application
 version: 0.1.0
-appVersion: "1.0.0"
+appVersion: "1.0"
