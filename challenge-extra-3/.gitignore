@@ -1,0 +1,9 @@
+# Helm unittest output (none by default)
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Temp
+*.log
