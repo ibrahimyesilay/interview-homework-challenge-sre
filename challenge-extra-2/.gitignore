@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtualenv
+.venv/
+venv/
+ENV/
+.env
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Pulumi (local state/caches)
+.pulumi/
+**/.pulumi/
+
+# Logs / temp
+*.log
+*.tmp
+tmp/

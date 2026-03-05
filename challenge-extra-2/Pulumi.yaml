@@ -1,0 +1,4 @@
+name: challenge-extra-2
+runtime:
+  name: python
+description: "Extra Challenge 2 - Provision same K8s resources as extra-1 using Pulumi (native resources, modular)"
